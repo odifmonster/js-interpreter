@@ -4,3 +4,4 @@ out/
 images_out/
 .access-token
 tests.ipynb
+*.txt

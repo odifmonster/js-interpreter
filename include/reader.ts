@@ -24,7 +24,7 @@ export function readerFromContent(content: string): Reader {
   let cstream = mkCharStream(content, 0);
 
   return {
-    isEnded: cstream.isEmpty,
+    isEnded: () => cstream.isEmpty(),
     read: () => {
       const c = cstream.head();
       pos++;
@@ -34,7 +34,7 @@ export function readerFromContent(content: string): Reader {
     tell: () => pos,
     seek: (offset: number, whence?: Whence) => {
       if (whence === undefined) whence = "START";
-      if (whence === "CUR") offset = pos + offset;
+      if (whence === "CUR") offset += pos;
       cstream = mkCharStream(content, offset);
       pos = offset;
     }

@@ -1,6 +1,4 @@
-export type Stream<T> = Readonly<_Stream<T>>;
-
-interface _Stream<T> {
+export interface Stream<T> {
   isEmpty: () => boolean;
   head: () => T;
   tail: () => Stream<T>;
