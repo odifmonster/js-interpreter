@@ -86,7 +86,7 @@ def write_groups(dest: TextIOWrapper, vals: set[str], grp_size = 5) -> None:
 
 def add_states_tokens(destpath: str, delta: DeltaFunc, rsvd: dict[str, str]) -> None:
     states: set[str] = set(delta.keys())
-    tokens: set[str] = set()
+    tokens: set[str] = { "START" }
 
     for val in delta.values():
         for _, tok, _ in val.values():
