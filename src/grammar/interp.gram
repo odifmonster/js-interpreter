@@ -92,6 +92,36 @@ assign_op ::= EQ1 ___ { _ => mkAugBinop("ASSIGN") }
     \ CARET_EQ ___ { _ => mkAugBinop("AUGBXOR") }
     \ PIPE_EQ ___ { _ => mkAugBinop("AUGBOR") }
 
+block ::= lbrace stmt_seq rbrace ___ { mkBlock }
+
+lbrace ::= LBRACE ___ { mkEmpty }
+
+rbrace ::= RBRACE ___ { mkEmpty }
+
+stmt ::= end_stmt ___ { res => res[0] }
+    \ assign_e end_stmt ___ { buildStmt }
+    \ init_kw name equals assign_e end_stmt ___ { buildInitVarStmt }
+    \ block ___ { res => res[0] }
+    \ if lparen assign_e rparen stmt ( else stmt ) ___ { buildIfStmt }
+    \ while lparen assign_e rparen stmt ___ { buildWhileStmt }
+
+end_stmt ::= SEMICOLON ___ { mkEmpty }
+
+init_kw ::= LET_KW ___ { _ => "let" }
+    \ CONST_KW ___ { _ => "const" }
+
+name ::= IDENT ___ { tok => tok.value }
+
+equals ::= EQ1 ___ { mkEmpty }
+
+if ::= IF_KW ___ { mkEmpty }
+
+else ::= ELSE_KW ___ { mkEmpty }
+
+while ::= WHILE_KW ___ { mkEmpty }
+
+stmt_seq ::= [ stmt ] ___ { res => res.filter(s => s.kind !== "empty") }
+
 AUG_UNOPS ::= POSTINC POSTDEC PREINC PREDEC
 
 AUG_BINOPS ::= ASSIGN AUGEXPN AUGMULT AUGDIV AUGMOD
