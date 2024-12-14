@@ -20,13 +20,13 @@ function matchOptional(tokStrm, optRule) {
 }
 
 function matchStar(tokStrm, starRule) {
-  function matchStar2(tokStrm, resAll) {
-    let tempStrm = tokStrm, res = [];
-    [tempStrm, res] = matchOptional(tempStrm, starRule);
-    if (res.length === 0) return [tokStrm, resAll];
-    return matchStar2(tempStrm, resAll.concat(res));
+  let resAll = [];
+  let res = undefined
+  while (res === undefined || res.length > 0) {
+    [tokStrm, res] = matchOptional(tempStrm, starRule);
+    resAll = resAll.concat(res);
   }
-  return matchStar2(tokStrm, []);
+  return [tempStrm, resAll];
 }
 
 function matchNonTerm(tokStrm, ntRule) {
