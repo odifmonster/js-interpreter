@@ -3,20 +3,27 @@ atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
     \ FALSE_TOK ___ { _ => mkBoolean(false) }
     \ IDENT ___ { tok => mkIdent(tok.value) }
 
-paren_e ::= lparen logor_e rparen ___ { res => res[1] }
+paren_e ::= lparen assign_e rparen ___ { res => res[1] }
     \ atom_e ___ { res => res[0] }
 
 lparen ::= LPAREN ___ { mkEmpty }
 
 rparen ::= RPAREN ___ { mkEmpty }
 
+postfix_e ::= paren_e [ postfix_op ] ___ { buildPostUnopTree }
+
+postfix_op ::= PLUS2 ___ { _ => mkAugUnop("POSTINC") }
+    \ MINUS2 ___ { _ => mkAugUnop("POSTDEC") }
+
 prefix_e ::= prefix_op prefix_e ___ { buildPreUnopTree }
-    \ paren_e ___ { res => res[0] }
+    \ postfix_e ___ { res => res[0] }
 
 prefix_op ::= EXCLAM ___ { _ => mkUnop("LOGNOT") }
     \ TILDE ___ { _ => mkUnop("BITNOT") }
-    \ PLUS ___ { _ => mkUnop("POS") }
-    \ MINUS ___ { _ => mkUnop("NEG") }
+    \ PLUS1 ___ { _ => mkUnop("POS") }
+    \ MINUS1 ___ { _ => mkUnop("NEG") }
+    \ PLUS2 ___ { _ => mkAugUnop("PREINC") }
+    \ MINUS2 ___ { _ => mkAugUnop("PREDEC") }
 
 pow_e ::= prefix_e ( pow_op pow_e ) ___ { buildBinopTree }
 
@@ -30,8 +37,8 @@ prod_op ::= STAR1 ___ { _ => mkBinop("MULT") }
 
 sum_e ::= prod_e [ sum_op prod_e ] ___ { buildBinopTree }
 
-sum_op ::= PLUS ___ { _ => mkBinop("ADD") }
-    \ MINUS ___ { _ => mkBinop("SUB") }
+sum_op ::= PLUS1 ___ { _ => mkBinop("ADD") }
+    \ MINUS1 ___ { _ => mkBinop("SUB") }
 
 shift_e ::= sum_e [ shift_op sum_e ] ___ { buildBinopTree }
 
@@ -41,9 +48,9 @@ shift_op ::= LANGLE2 ___ { _ => mkBinop("LSHIFT") }
 compare_e ::= shift_e [ compare_op shift_e ] ___ { buildBinopTree }
 
 compare_op ::= LANGLE1 ___ { _ => mkBinop("LT") }
-    \ LANGLE_EQ ___ { _ => mkBinop("LTEQ") }
+    \ LANGLE1_EQ ___ { _ => mkBinop("LTEQ") }
     \ RANGLE1 ___ { _ => mkBinop("GT") }
-    \ RANGLE_EQ ___ { _ => mkBinop("GTEQ") }
+    \ RANGLE1_EQ ___ { _ => mkBinop("GTEQ") }
 
 iseq_e ::= compare_e [ iseq_op compare_e ] ___ { buildBinopTree }
 
@@ -69,6 +76,27 @@ logand_op ::= AMPER2 ___ { _ => mkBinop("LOGAND") }
 logor_e ::= logand_e [ logor_op logand_e ] ___ { buildBinopTree }
 
 logor_op ::= PIPE2 ___ { _ => mkBinop("LOGOR") }
+
+assign_e ::= logor_e ( assign_op assign_e ) ___ { buildBinopTree }
+
+assign_op ::= EQ1 ___ { _ => mkAugBinop("ASSIGN") }
+    \ STAR2_EQ ___ { _ => mkAugBinop("AUGEXPN") }
+    \ STAR1_EQ ___ { _ => mkAugBinop("AUGMULT") }
+    \ SLASH_EQ ___ { _ => mkAugBinop("AUGDIV") }
+    \ MOD_EQ ___ { _ => mkAugBinop("AUGMOD") }
+    \ PLUS_EQ ___ { _ => mkAugBinop("AUGADD") }
+    \ MINUS_EQ ___ { _ => mkAugBinop("AUGSUB") }
+    \ LANGLE2_EQ ___ { _ => mkAugBinop("AUGLSHIFT") }
+    \ RANGLE2_EQ ___ { _ => mkAugBinop("AUGRSHIFT") }
+    \ AMPER_EQ ___ { _ => mkAugBinop("AUGBAND") }
+    \ CARET_EQ ___ { _ => mkAugBinop("AUGBXOR") }
+    \ PIPE_EQ ___ { _ => mkAugBinop("AUGBOR") }
+
+AUG_UNOPS ::= POSTINC POSTDEC PREINC PREDEC
+
+AUG_BINOPS ::= ASSIGN AUGEXPN AUGMULT AUGDIV AUGMOD
+    AUGADD AUGSUB AUGLSHIFT AUGRSHIFT AUGBAND
+    AUGBXOR AUGBOR
 
 UNOPS ::= LOGNOT BITNOT POS NEG
 

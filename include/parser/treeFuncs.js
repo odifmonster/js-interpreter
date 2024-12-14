@@ -26,6 +26,14 @@ export function mkUnop(op) {
   return { kind: "unop", op: op, child: empty };
 }
 
+export function mkAugBinop(op) {
+  return { kind: "augbinop", op: op, left: empty, right: empty };
+}
+
+export function mkAugUnop(op) {
+  return { kind: "augunop", op: op, child: empty };
+}
+
 export function buildBinopTree(res) {
   const first = res.shift();
   return res.reduce((acc, e, i) => {
@@ -41,4 +49,12 @@ export function buildBinopTree(res) {
 export function buildPreUnopTree(res) {
   res[0].child = res[1];
   return res[0];
+}
+
+export function buildPostUnopTree(res) {
+  const first = res.shift();
+  return res.reduce((acc, e) => {
+    e.child = acc;
+    return e;
+  }, first);
 }
