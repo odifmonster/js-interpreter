@@ -2,7 +2,7 @@ atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
     \ IDENT ___ { tok => mkIdent(tok.value) }
 
 paren_e ::= lparen sum_e rparen ___ { res => res[1] }
-    \ sum_e ___ { res => res[0] }
+    \ atom_e ___ { res => res[0] }
 
 lparen ::= LPAREN ___ { mkEmpty }
 

@@ -1,15 +1,7 @@
-import type { Stream } from "../include/stream.js";
-import type { Token } from "../include/lexer/lexTypes.js";
+import type { Expression } from "../include/parser/parseTypes.js";
 
-import { readerFromFile } from "../include/reader.js";
-import { mkTokenStream } from "../include/lexer/lexer.js";
+import { parseFile } from "../include/parser/parser.js";
 
-function printTokStream(s: Stream<Token>): void {
-  while (!s.isEmpty()) {
-    console.log(s.head());
-    s = s.tail();
-  }
-}
+const progAST: Expression = parseFile("./src/programs/numberOps.js") as Expression;
 
-const tstream: Stream<Token> = mkTokenStream(readerFromFile("./src/programs/numberOps.js"));
-printTokStream(tstream);
+console.log(JSON.stringify(progAST, undefined, 2));
