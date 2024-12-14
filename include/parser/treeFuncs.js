@@ -18,6 +18,10 @@ export function mkBinop(op) {
   return { kind: "binop", op: op, left: empty, right: empty };
 }
 
+export function mkUnop(op) {
+  return { kind: "unop", op: op, child: empty };
+}
+
 export function buildBinopTree(res) {
   const first = res.shift();
   return res.reduce((acc, e, i) => {
@@ -28,4 +32,9 @@ export function buildBinopTree(res) {
     acc.right = e;
     return acc;
   }, first);
+}
+
+export function buildPreUnopTree(res) {
+  res[0].child = res[1];
+  return res[0];
 }

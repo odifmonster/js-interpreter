@@ -23,10 +23,10 @@ function matchStar(tokStrm, starRule) {
   let resAll = [];
   let res = undefined
   while (res === undefined || res.length > 0) {
-    [tokStrm, res] = matchOptional(tempStrm, starRule);
+    [tokStrm, res] = matchOptional(tokStrm, starRule);
     resAll = resAll.concat(res);
   }
-  return [tempStrm, resAll];
+  return [tokStrm, resAll];
 }
 
 function matchNonTerm(tokStrm, ntRule) {
@@ -67,8 +67,8 @@ function matchSymbol(tokStrm, symbol) {
 }
 
 function parse(stream) {
-  const [_, tree] = matchSymbol(stream.tail(), "sum_e");
-  if (tree === undefined) throw new Error("SyntacticError: Something bad happened.");
+  const [newStream, tree] = matchSymbol(stream.tail(), "logor_e");
+  if (tree === undefined || !newStream.isEmpty()) throw new Error("SyntacticError: Something bad happened.");
   return tree;
 }
 

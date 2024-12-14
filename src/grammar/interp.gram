@@ -1,14 +1,22 @@
 atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
     \ IDENT ___ { tok => mkIdent(tok.value) }
 
-paren_e ::= lparen sum_e rparen ___ { res => res[1] }
+paren_e ::= lparen logor_e rparen ___ { res => res[1] }
     \ atom_e ___ { res => res[0] }
 
 lparen ::= LPAREN ___ { mkEmpty }
 
 rparen ::= RPAREN ___ { mkEmpty }
 
-pow_e ::= paren_e ( pow_op pow_e ) ___ { buildBinopTree }
+prefix_e ::= prefix_op prefix_e ___ { buildPreUnopTree }
+    \ paren_e ___ { res => res[0] }
+
+prefix_op ::= EXCLAM ___ { _ => mkUnop("LOGNOT") }
+    \ TILDE ___ { _ => mkUnop("BITNOT") }
+    \ PLUS ___ { _ => mkUnop("POS") }
+    \ MINUS ___ { _ => mkUnop("NEG") }
+
+pow_e ::= prefix_e ( pow_op pow_e ) ___ { buildBinopTree }
 
 pow_op ::= STAR2 ___ { _ => mkBinop("EXPN") }
 
@@ -23,4 +31,46 @@ sum_e ::= prod_e [ sum_op prod_e ] ___ { buildBinopTree }
 sum_op ::= PLUS ___ { _ => mkBinop("ADD") }
     \ MINUS ___ { _ => mkBinop("SUB") }
 
-OPS ::= EXPN MULT DIV MOD ADD SUB
+shift_e ::= sum_e [ shift_op sum_e ] ___ { buildBinopTree }
+
+shift_op ::= LANGLE2 ___ { _ => mkBinop("LSHIFT") }
+    \ RANGLE2 ___ { _ => mkBinop("RSHIFT") }
+
+compare_e ::= shift_e [ compare_op shift_e ] ___ { buildBinopTree }
+
+compare_op ::= LANGLE1 ___ { _ => mkBinop("LT") }
+    \ LANGLE_EQ ___ { _ => mkBinop("LTEQ") }
+    \ RANGLE1 ___ { _ => mkBinop("GT") }
+    \ RANGLE_EQ ___ { _ => mkBinop("GTEQ") }
+
+iseq_e ::= compare_e [ iseq_op compare_e ] ___ { buildBinopTree }
+
+iseq_op ::= EQ2 ___ { _ => mkBinop("ISEQ") }
+    \ EXCLAM_EQ ___ { _ => mkBinop("NOTEQ") }
+
+bitand_e ::= iseq_e [ bitand_op iseq_e ] ___ { buildBinopTree }
+
+bitand_op ::= AMPER1 ___ { _ => mkBinop("BITAND") }
+
+bitxor_e ::= bitand_e [ bitxor_op bitand_e ] ___ { buildBinopTree }
+
+bitxor_op ::= CARET ___ { _ => mkBinop("BITXOR") }
+
+bitor_e ::= bitxor_e [ bitor_op bitxor_e ] ___ { buildBinopTree }
+
+bitor_op ::= PIPE1 ___ { _ => mkBinop("BITOR") }
+
+logand_e ::= bitor_e [ logand_op bitor_e ] ___ { buildBinopTree }
+
+logand_op ::= AMPER2 ___ { _ => mkBinop("LOGAND") }
+
+logor_e ::= logand_e [ logor_op logand_e ] ___ { buildBinopTree }
+
+logor_op ::= PIPE2 ___ { _ => mkBinop("LOGOR") }
+
+UNOPS ::= LOGNOT BITNOT POS NEG
+
+BINOPS ::= EXPN MULT DIV MOD ADD SUB
+    LSHIFT RSHIFT LT LTEQ GT GTEQ ISEQ
+    NOTEQ BITAND BITXOR BITOR LOGAND
+    LOGOR
