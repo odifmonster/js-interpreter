@@ -30,8 +30,8 @@ describe("getVarValue", () => {
   });
 
   it("correctly interprets an expression with constants", () => {
-    const ast = parse({ kind: "string", value: "(5+1)" });
+    const ast = parse({ kind: "string", value: "(5+2)**2" });
     console.log(interpExpression({}, ast));
-    expect(interpExpression({}, ast)).toEqual(6);
+    expect(interpExpression({}, ast)).toEqual(49);
   });
 });

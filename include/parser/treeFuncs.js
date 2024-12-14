@@ -15,7 +15,7 @@ export function mkIdent(name) {
 export const mkEmpty = () => empty;
 
 export function mkBinop(op) {
-  return { kind: "binop", operator: op, left: empty, right: empty };
+  return { kind: "binop", op: op, left: empty, right: empty };
 }
 
 export function buildBinopTree(res) {
