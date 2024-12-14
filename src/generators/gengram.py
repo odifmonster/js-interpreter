@@ -25,7 +25,7 @@ def parse_groups(fpath: str) -> list[str]:
             groups.append(cur_group)
             cur_group = line
         else:
-            cur_group = cur_group + line
+            cur_group = cur_group + " " + line
     
     groups.append(cur_group)
     return groups
