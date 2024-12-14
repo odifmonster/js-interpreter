@@ -13,13 +13,17 @@ function getNextToken(src: Reader, state: LexerState, value: string): Token {
 
   let c: string | undefined = undefined;
   const endFlag = src.isEnded();
-  if (!endFlag) c = src.read();
+  if (!endFlag) {
+    c = src.read();
+  } else {
+    c = "EOF";
+  }
 
   let transVal: TransVal;
-  if (c !== undefined && c in subDelta) transVal = subDelta[c];
+  if (c in subDelta) transVal = subDelta[c];
   else transVal = subDelta[OTHER];
 
-  c = c === undefined ? "" : c;
+  c = c === "EOF" ? "" : c;
   if (transVal.consume) value = value + c;
 
   if ("retVal" in transVal) {

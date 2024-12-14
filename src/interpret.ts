@@ -1,10 +1,16 @@
 import type {
-  Expression, Unop, Binop, AugUnop, AugBinop
+  Statement, Expression,
+  Unop, Binop, AugUnop, AugBinop
 } from "../include/parser/parseTypes.js";
 
 export const PARENT_KEY = Symbol("[[PARENT]]");
+
 type ExpValue = number | boolean;
-export type VarValue = ExpValue | { kind: "undefined" };
+export type VarValue = {
+  initKind: "let" | "const";
+  value: ExpValue | { kind: "undefined" } | { kind: "initialized" };
+};
+
 export type State = { [key: string]: VarValue; [PARENT_KEY]?: State };
 
 const unopBadType: (op: Unop | AugUnop, val: ExpValue) => Error = (op, val) =>
@@ -16,6 +22,9 @@ const binopBadType: (op: Binop | AugBinop, v1: ExpValue, v2: ExpValue) => Error 
 const opRequiresLVal: (op: AugUnop | AugBinop) => Error = (op) =>
   new Error(`SemanticError: '${op}' operation requires assignable expression.`);
 
+const modifiedConst: (name: string) => Error = name =>
+  new Error(`SemanticError: Cannot modify constant '${name}'.`);
+
 function getVarScope(state: State, name: string): State {
   if (!(PARENT_KEY in state) || name in state) return state;
   return getVarScope(state[PARENT_KEY], name);
@@ -24,7 +33,7 @@ function getVarScope(state: State, name: string): State {
 function getVarValue(state: State, name: string): ExpValue {
   const varScope = getVarScope(state, name);
   if (!(name in varScope)) throw new Error(`SemanticError: Unknown identifier '${name}'.`);
-  const varVal = varScope[name];
+  const varVal = varScope[name].value;
   if (typeof varVal === "object") throw new Error(`SemanticError: Variable '${name}' referenced before assignment.`);
   return varVal;
 }
@@ -50,18 +59,19 @@ function interpAugUnop(state: State, exp: Expression): ExpValue {
   const varScope = getVarScope(state, exp.child.name);
   const startVal = interpExpression(state, exp.child);
   if (typeof startVal !== "number") throw unopBadType(exp.op, startVal);
+  if (varScope[exp.child.name].initKind === "const") throw modifiedConst(exp.child.name);
 
   switch (exp.op) {
     case "POSTINC":
-      varScope[exp.child.name] = startVal + 1;
+      varScope[exp.child.name].value = startVal + 1;
       return startVal;
     case "POSTDEC":
-      varScope[exp.child.name] = startVal - 1;
+      varScope[exp.child.name].value = startVal - 1;
       return startVal;
     case "PREINC":
-      return varScope[exp.child.name] = startVal + 1;
+      return varScope[exp.child.name].value = startVal + 1;
     case "PREDEC":
-      return varScope[exp.child.name] = startVal - 1;
+      return varScope[exp.child.name].value = startVal - 1;
   }
 }
 
@@ -127,8 +137,10 @@ function interpAugBinop(state: State, exp: Expression): ExpValue {
   const rval = interpExpression(state, exp.right);
 
   if (!(exp.left.name in varScope)) throw new Error(`SemanticError: Unknown identifier '${exp.left.name}'.`);
+  if (varScope[exp.left.name].initKind === "const") throw modifiedConst(exp.left.name);
+
   if (exp.op === "ASSIGN") {
-    return varScope[exp.left.name] = rval;
+    return varScope[exp.left.name].value = rval;
   }
 
   const lval = interpExpression(state, exp.left);
@@ -155,7 +167,7 @@ function interpAugBinop(state: State, exp: Expression): ExpValue {
     case "AUGBOR": newVal = lval | rval; break;
   }
 
-  return varScope[exp.left.name] = newVal;
+  return varScope[exp.left.name].value = newVal;
 }
 
 function interpBinop(state: State, binop: Expression): ExpValue {
@@ -196,4 +208,69 @@ export function interpExpression(state: State, exp: Expression): ExpValue {
     case "augbinop":
       return interpAugBinop(state, exp);
   }
+}
+
+function interpInitVar(state: State, stmt: Statement): void {
+  if (!(stmt.kind === "let" || stmt.kind === "const")) throw new Error();
+  if (!(stmt.name in state)) throw new Error();
+
+  const varVal = state[stmt.name].value;
+  if (!(typeof varVal === "object" && varVal.kind === "undefined"))
+    throw new Error(`SemanticError: Variable '${stmt.name}' already initialized.`);
+
+  state[stmt.name].value = interpExpression(state, stmt.value);
+}
+
+function interpBlock(state: State, stmt: Statement): void {
+  if (stmt.kind !== "block") throw new Error();
+
+  stmt.body.forEach(s => {
+    if ((s.kind === "let" || s.kind === "const") && !(s.name in state)) {
+      state[s.name] = { initKind: s.kind, value: { kind: "undefined" } };
+    }
+  });
+
+  stmt.body.forEach(s => interpStatement(state, s));
+}
+
+function interpWhile(state: State, stmt: Statement): void {
+  if (stmt.kind !== "while") throw new Error();
+
+  const testVal = interpExpression(state, stmt.test);
+  if (testVal) {
+    interpStatement(state, stmt.body);
+    interpWhile(state, stmt);
+  }
+}
+
+export function interpStatement(state: State, stmt: Statement): void {
+  switch (stmt.kind) {
+    case "empty":
+      break;
+    case "exp":
+      interpExpression(state, stmt.exp);
+      break;
+    case "let":
+    case "const":
+      interpInitVar(state, stmt);
+      break;
+    case "block":
+      interpBlock({ [PARENT_KEY]: state }, stmt);
+      break;
+    case "if":
+      if (interpExpression(state, stmt.test)) {
+        interpStatement(state, stmt.truePart);
+      } else {
+        interpStatement(state, stmt.falsePart);
+      }
+      break;
+    case "while":
+      interpWhile(state, stmt);
+  }
+}
+
+export function interpProgram(prog: Statement[]): State {
+  const globalState: State = {};
+  interpBlock(globalState, { kind: "block", body: prog });
+  return globalState;
 }

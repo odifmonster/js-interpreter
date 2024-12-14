@@ -96,13 +96,16 @@ ident -> [a-zA-Z_0-9] ident
 [ident -> OTHER <IDENT>]
 
 comment -> NEWLINE <COMMENT>
+[comment -> EOF <COMMENT>]
 comment -> OTHER comment
 
 multicmt -> * end_multicmt
+[multicmt -> EOF <ERROR>]
 multicmt -> OTHER multicmt
 
 end_multicmt -> * end_multicmt
 end_multicmt -> / <COMMENT>
+[end_multicmt -> EOF <ERROR>]
 end_multicmt -> OTHER multicmt
 
 RESERVED

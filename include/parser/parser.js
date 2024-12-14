@@ -67,7 +67,7 @@ function matchSymbol(tokStrm, symbol) {
 }
 
 function parse(stream) {
-  const [newStream, tree] = matchSymbol(stream.tail(), "assign_e");
+  const [newStream, tree] = matchSymbol(stream.filter(t => t.kind !== "COMMENT").tail(), "stmt_seq");
   if (tree === undefined || !newStream.isEmpty()) throw new Error("SyntacticError: Something bad happened.");
   return tree;
 }
