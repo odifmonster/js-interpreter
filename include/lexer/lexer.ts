@@ -6,7 +6,7 @@ import type {
 
 import { snode, sempty } from "../stream.js";
 import { OTHER } from "./lexTypes.js";
-import { DELTA_FUNC } from "./lexDelta.js";
+import { DELTA_FUNC, RESERVED } from "./lexDelta.js";
 
 function getNextToken(src: Reader, state: LexerState, value: string): Token {
   const subDelta = DELTA_FUNC[state];
@@ -26,6 +26,10 @@ function getNextToken(src: Reader, state: LexerState, value: string): Token {
     if (transVal.retVal === "ERROR")
       throw new Error("LexicalError: Something bad happened.");
     if (!(transVal.consume || endFlag)) src.seek(-1, "CUR");
+
+    if (transVal.retVal === "IDENT" && value in RESERVED) {
+      return { kind: RESERVED[value], value: value };
+    }
     return { kind: transVal.retVal, value: value };
   } else if ("nextState" in transVal) {
     return getNextToken(src, transVal.nextState, value);

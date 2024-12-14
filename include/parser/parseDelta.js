@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import {
-  mkNumber, mkIdent, mkEmpty, mkBinop,
+  mkNumber, mkBoolean, mkIdent, mkEmpty, mkBinop,
   mkUnop, buildPreUnopTree, buildBinopTree
 } from "./treeFuncs.js";
 
@@ -12,6 +12,8 @@ import {
 export const GRAMMAR = {
   atom_e: [
     { token: "NUMBER", action: tok => mkNumber(parseFloat(tok.value)) },
+    { token: "TRUE_TOK", action: _ => mkBoolean(true) },
+    { token: "FALSE_TOK", action: _ => mkBoolean(false) },
     { token: "IDENT", action: tok => mkIdent(tok.value) },
   ],
   paren_e: [

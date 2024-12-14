@@ -8,6 +8,10 @@ export function mkNumber(x) {
   return { kind: "number", value: x };
 }
 
+export function mkBoolean(p) {
+  return { kind: "boolean", value: p };
+}
+
 export function mkIdent(name) {
   return { kind: "ident", name: name };
 }

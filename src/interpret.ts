@@ -1,7 +1,8 @@
 import type { Expression } from "../include/parser/parseTypes.js";
 
 export const PARENT_KEY = Symbol("[[PARENT]]");
-export type VarValue = number | { kind: "undefined" };
+type ExpValue = number | boolean;
+export type VarValue = ExpValue | { kind: "undefined" };
 export type State = { [key: string]: VarValue; [PARENT_KEY]?: State; };
 
 function getVarScope(state: State, name: string): State {
@@ -9,7 +10,7 @@ function getVarScope(state: State, name: string): State {
   return getVarScope(state[PARENT_KEY], name);
 }
 
-function getVarValue(state: State, name: string): number {
+function getVarValue(state: State, name: string): ExpValue {
   const varScope = getVarScope(state, name);
   if (!(name in varScope)) throw new Error(`SemanticError: Unknown identifier '${name}'.`);
   const varVal = varScope[name];

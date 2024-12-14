@@ -1,4 +1,6 @@
 atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
+    \ TRUE_TOK ___ { _ => mkBoolean(true) }
+    \ FALSE_TOK ___ { _ => mkBoolean(false) }
     \ IDENT ___ { tok => mkIdent(tok.value) }
 
 paren_e ::= lparen logor_e rparen ___ { res => res[1] }
