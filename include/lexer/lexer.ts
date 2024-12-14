@@ -12,7 +12,8 @@ function getNextToken(src: Reader, state: LexerState, value: string): Token {
   const subDelta = DELTA_FUNC[state];
 
   let c: string | undefined = undefined;
-  if (!src.isEnded()) c = src.read();
+  const endFlag = src.isEnded();
+  if (!endFlag) c = src.read();
 
   let transVal: TransVal;
   if (c !== undefined && c in subDelta) transVal = subDelta[c];
@@ -24,7 +25,7 @@ function getNextToken(src: Reader, state: LexerState, value: string): Token {
   if ("retVal" in transVal) {
     if (transVal.retVal === "ERROR")
       throw new Error("LexicalError: Something bad happened.");
-    if (!(transVal.consume || src.isEnded())) src.seek(-1, "CUR");
+    if (!(transVal.consume || endFlag)) src.seek(-1, "CUR");
     return { kind: transVal.retVal, value: value };
   } else if ("nextState" in transVal) {
     return getNextToken(src, transVal.nextState, value);
