@@ -2,6 +2,7 @@
 tok -> ( <LPAREN>
 tok -> ) <RPAREN>
 tok -> ~ <TILDE>
+tok -> ; <SEMICOLON>
 tok -> + plus
 tok -> - minus
 tok -> / slash
@@ -29,6 +30,8 @@ minus -> = <MINUS_EQ>
 [minus -> OTHER <MINUS1>]
 
 slash -> = <SLASH_EQ>
+slash -> / comment
+slash -> * multicmt
 [slash -> OTHER <SLASH>]
 
 mod -> = <MOD_EQ>
@@ -90,6 +93,21 @@ end_float -> [0-9] end_float
 ident -> [a-zA-Z_0-9] ident
 [ident -> OTHER <IDENT>]
 
+comment -> NEWLINE <COMMENT>
+comment -> OTHER comment
+
+multicmt -> * end_multicmt
+multicmt -> OTHER multicmt
+
+end_multicmt -> * end_multicmt
+end_multicmt -> / <COMMENT>
+end_multicmt -> OTHER multicmt
+
 RESERVED
     true -> TRUE_TOK
     false -> FALSE_TOK
+    let -> LET_KW
+    const -> CONST_KW
+    if -> IF_KW
+    else -> ELSE_KW
+    while -> WHILE_KW

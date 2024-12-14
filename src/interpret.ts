@@ -1,15 +1,20 @@
-import type { Expression, Unop, Binop } from "../include/parser/parseTypes.js";
+import type {
+  Expression, Unop, Binop, AugUnop, AugBinop
+} from "../include/parser/parseTypes.js";
 
 export const PARENT_KEY = Symbol("[[PARENT]]");
 type ExpValue = number | boolean;
 export type VarValue = ExpValue | { kind: "undefined" };
 export type State = { [key: string]: VarValue; [PARENT_KEY]?: State };
 
-const unopBadType: (op: Unop, val: ExpValue) => Error = (op, val) =>
+const unopBadType: (op: Unop | AugUnop, val: ExpValue) => Error = (op, val) =>
   new Error(`SemanticError: '${op}' operation invalid for type '${typeof val}'.`);
 
-const binopBadType: (op: Binop, v1: ExpValue, v2: ExpValue) => Error = (op, v1, v2) =>
+const binopBadType: (op: Binop | AugBinop, v1: ExpValue, v2: ExpValue) => Error = (op, v1, v2) =>
   new Error(`SemanticError: '${op}' operation invalid for types '${typeof v1}' and '${typeof v2}'.`);
+
+const opRequiresLVal: (op: AugUnop | AugBinop) => Error = (op) =>
+  new Error(`SemanticError: '${op}' operation requires assignable expression.`);
 
 function getVarScope(state: State, name: string): State {
   if (!(PARENT_KEY in state) || name in state) return state;
@@ -34,6 +39,29 @@ function interpNumUnop(op: Unop, val: ExpValue): number {
       return -val;
     default:
       throw new Error();
+  }
+}
+
+function interpAugUnop(state: State, exp: Expression): ExpValue {
+  if (exp.kind !== "augunop") throw new Error();
+  if (exp.child.kind !== "ident")
+    throw opRequiresLVal(exp.op);
+
+  const varScope = getVarScope(state, exp.child.name);
+  const startVal = interpExpression(state, exp.child);
+  if (typeof startVal !== "number") throw unopBadType(exp.op, startVal);
+
+  switch (exp.op) {
+    case "POSTINC":
+      varScope[exp.child.name] = startVal + 1;
+      return startVal;
+    case "POSTDEC":
+      varScope[exp.child.name] = startVal - 1;
+      return startVal;
+    case "PREINC":
+      return varScope[exp.child.name] = startVal + 1;
+    case "PREDEC":
+      return varScope[exp.child.name] = startVal - 1;
   }
 }
 
@@ -91,6 +119,45 @@ function interpNumBinop(binop: Binop, lval: ExpValue, rval: ExpValue): ExpValue 
   }
 }
 
+function interpAugBinop(state: State, exp: Expression): ExpValue {
+  if (exp.kind !== "augbinop") throw new Error();
+  if (exp.left.kind !== "ident") throw opRequiresLVal(exp.op);
+
+  const varScope = getVarScope(state, exp.left.name);
+  const rval = interpExpression(state, exp.right);
+
+  if (!(exp.left.name in varScope)) throw new Error(`SemanticError: Unknown identifier '${exp.left.name}'.`);
+  if (exp.op === "ASSIGN") {
+    return varScope[exp.left.name] = rval;
+  }
+
+  const lval = interpExpression(state, exp.left);
+  if (!(typeof lval === "number" && typeof rval === "number"))
+    throw binopBadType(exp.op, lval, rval);
+
+  let newVal: number;
+
+  switch (exp.op) {
+    case "AUGEXPN":
+      newVal = lval ** rval;
+      break;
+    case "AUGMULT":
+      newVal = lval * rval;
+      break;
+    case "AUGDIV": newVal = lval / rval; break;
+    case "AUGMOD": newVal = lval % rval; break;
+    case "AUGADD": newVal = lval + rval; break;
+    case "AUGSUB": newVal = lval - rval; break;
+    case "AUGLSHIFT": newVal = lval << rval; break;
+    case "AUGRSHIFT": newVal = lval >> rval; break;
+    case "AUGBAND": newVal = lval & rval; break;
+    case "AUGBXOR": newVal = lval ^ rval; break;
+    case "AUGBOR": newVal = lval | rval; break;
+  }
+
+  return varScope[exp.left.name] = newVal;
+}
+
 function interpBinop(state: State, binop: Expression): ExpValue {
   if (binop.kind !== "binop") throw new Error();
 
@@ -122,7 +189,11 @@ export function interpExpression(state: State, exp: Expression): ExpValue {
       return getVarValue(state, exp.name);
     case "unop":
       return interpUnop(state, exp);
+    case "augunop":
+      return interpAugUnop(state, exp);
     case "binop":
       return interpBinop(state, exp);
+    case "augbinop":
+      return interpAugBinop(state, exp);
   }
 }

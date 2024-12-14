@@ -86,3 +86,58 @@ describe("interpBinop", () => {
     expect(interpExpression(state, parse("(x ** 2 >= 36 || +y < 0) && (z - (z % 2)) / 2 == -someVar"))).toEqual(false);
   });
 });
+
+describe("interpAugUnop", () => {
+  it("throws the correct errors", () => {
+    const state: State = {
+      x: true, y: 5, z: { kind: "undefined" }
+    };
+    
+    const exps = ["++(y*3)", "x--", "++z**2"];
+    const errors = [
+      "'PREINC' operation requires assignable expression.",
+      "'POSTDEC' operation invalid for type 'boolean'.",
+      "Variable 'z' referenced before assignment."
+    ];
+
+    [0, 1, 2].forEach(i =>
+      expect(() => interpExpression(state, parse(exps[i]))).toThrow("SemanticError: " + errors[i])
+    );
+  });
+
+  it("returns and updates in the correct order", () => {
+    const state: State = { x: 5 };
+    expect(interpExpression(state, parse("x++"))).toEqual(5);
+    expect(state["x"]).toEqual(6);
+    expect(interpExpression(state, parse("--x"))).toEqual(5);
+    expect(state["x"]).toEqual(5);
+  });
+});
+
+describe("interpAugBinop", () => {
+  it("throws the correct errors", () => {
+    const state: State = {
+      x: true, y: 5, z: { kind: "undefined" }
+    };
+
+    const exps = ["val = false", "false = x", "x = z", "y += x"];
+    const errors = [
+      "Unknown identifier 'val'.",
+      "'ASSIGN' operation requires assignable expression.",
+      "Variable 'z' referenced before assignment.",
+      "'AUGADD' operation invalid for types 'number' and 'boolean'."
+    ];
+
+    [0, 1, 2, 3].forEach(i =>
+      expect(() => interpExpression(state, parse(exps[i]))).toThrow("SemanticError: " + errors[i])
+    );
+  });
+
+  it("correctly updates the program state", () => {
+    const state: State = { val: 3, x: 1, y: 2 };
+    const endState: State = { val: 12, x: 2, y: 3 };
+
+    expect(interpExpression(state, parse("val *= x++ + ++y"))).toEqual(12);
+    expect(state).toEqual(endState);
+  });
+});
