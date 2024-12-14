@@ -3,5 +3,5 @@ coverage/
 out/
 images_out/
 .access-token
-tests.ipynb
+test.ipynb
 *.txt

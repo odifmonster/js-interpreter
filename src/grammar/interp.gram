@@ -1,0 +1,26 @@
+atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
+    \ IDENT ___ { tok => mkIdent(tok.value) }
+
+paren_e ::= lparen sum_e rparen ___ { res => res[1] }
+    \ sum_e ___ { res => res[0] }
+
+lparen ::= LPAREN ___ { mkEmpty }
+
+rparen ::= RPAREN ___ { mkEmpty }
+
+pow_e ::= paren_e ( pow_op pow_e ) ___ { buildBinopTree }
+
+pow_op ::= STAR2 ___ { _ => mkBinop("EXPN") }
+
+prod_e ::= pow_e [ prod_op pow_e ] ___ { buildBinopTree }
+
+prod_op ::= STAR1 ___ { _ => mkBinop("MULT") }
+    \ SLASH ___ { _ => mkBinop("DIV") }
+    \ MODULO ___ { _ => mkBinop("MOD") }
+
+sum_e ::= prod_e [ sum_op prod_e ] ___ { buildBinopTree }
+
+sum_op ::= PLUS ___ { _ => mkBinop("ADD") }
+    \ MINUS ___ { _ => mkBinop("SUB") }
+
+OPS ::= EXPN MULT DIV MOD ADD SUB
