@@ -65,9 +65,12 @@ export function buildPostUnopTree(res) {
 }
 
 export function buildCallExp(res) {
-  return {
-    kind: "call", callee: res[0], args: res[1]
-  };
+  const first = res.shift();
+  return res.reduce((acc, e) => {
+    return {
+      kind: "call", callee: acc, args: e
+    };
+  }, first);
 }
 
 export function buildFuncExp(params, body) {

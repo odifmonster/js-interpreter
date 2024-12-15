@@ -12,7 +12,7 @@ rparen ::= RPAREN ___ { mkEmpty }
 
 arg_e ::= lparen ( comma_e ) rparen ___ { res => res.length === 2 ? [] : res[1] }
 
-call_e ::= paren_e ( arg_e ) ___ { res => res.length === 1 ? res[0] : buildCallExp(res) }
+call_e ::= paren_e [ arg_e ] ___ { res => res.length === 1 ? res[0] : buildCallExp(res) }
 
 postfix_e ::= call_e [ postfix_op ] ___ { buildPostUnopTree }
 
@@ -108,8 +108,18 @@ lbrace ::= LBRACE ___ { mkEmpty }
 
 rbrace ::= RBRACE ___ { mkEmpty }
 
+arrow_args ::= lparen rparen ___ { _ => [] }
+    \ name ___ { res => res }
+    \ lparen param_e rparen ___ { res => res[1] }
+
+arrow_op ::= ARROW ___ { mkEmpty }
+
+arrow_body ::= func_e ___ { res => [buildReturnStmt(res[0])] }
+    \ block ___ { res => res[0].body }
+
 func_e ::= function lparen ( param_e ) rparen block ___ {
-    res => res.length === 4 ? buildFuncExp([], res[3]) : buildFuncExp(res[2], res[4]) }
+    res => res.length === 4 ? buildFuncExp([], res[3]) : buildFuncExp(res[2], res[4].body) }
+    \ arrow_args arrow_op arrow_body ___ { res => buildFuncExp(res[0], res[2]) }
     \ assign_e ___ { res => res[0] }
 
 function ::= FUNCTION_KW ___ { mkEmpty }
@@ -121,6 +131,10 @@ stmt ::= end_stmt ___ { res => res[0] }
     \ if lparen func_e rparen stmt ( else stmt ) ___ { buildIfStmt }
     \ while lparen func_e rparen stmt ___ { buildWhileStmt }
     \ return func_e end_stmt ___ { res => buildReturnStmt(res[1]) }
+    \ function name lparen ( param_e ) rparen block ___ {
+    res => res.length === 5 ?
+      buildInitVarStmt(["const", res[1], 0, buildFuncExp([], res[4].body), 0])
+      : buildInitVarStmt(["const", res[1], 0, buildFuncExp(res[3], res[5].body), 0]) }
 
 end_stmt ::= SEMICOLON ___ { mkEmpty }
 

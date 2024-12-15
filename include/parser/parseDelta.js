@@ -61,7 +61,7 @@ export const GRAMMAR = {
       rule: [
         "paren_e",
         {
-          kind: "opt",
+          kind: "star",
           symbols: ["arg_e"]
         },
       ],
@@ -349,6 +349,46 @@ export const GRAMMAR = {
   rbrace: [
     { token: "RBRACE", action: mkEmpty },
   ],
+  arrow_args: [
+    {
+      rule: [
+        "lparen",
+        "rparen",
+      ],
+      action: _ => []
+    },
+    {
+      rule: [
+        "name",
+      ],
+      action: res => res
+    },
+    {
+      rule: [
+        "lparen",
+        "param_e",
+        "rparen",
+      ],
+      action: res => res[1]
+    },
+  ],
+  arrow_op: [
+    { token: "ARROW", action: mkEmpty },
+  ],
+  arrow_body: [
+    {
+      rule: [
+        "func_e",
+      ],
+      action: res => [buildReturnStmt(res[0])]
+    },
+    {
+      rule: [
+        "block",
+      ],
+      action: res => res[0].body
+    },
+  ],
   func_e: [
     {
       rule: [
@@ -361,7 +401,15 @@ export const GRAMMAR = {
         "rparen",
         "block",
       ],
-      action: res => res.length === 4 ? buildFuncExp([], res[3]) : buildFuncExp(res[2], res[4])
+      action: res => res.length === 4 ? buildFuncExp([], res[3]) : buildFuncExp(res[2], res[4].body)
+    },
+    {
+      rule: [
+        "arrow_args",
+        "arrow_op",
+        "arrow_body",
+      ],
+      action: res => buildFuncExp(res[0], res[2])
     },
     {
       rule: [
@@ -434,6 +482,20 @@ export const GRAMMAR = {
         "end_stmt",
       ],
       action: res => buildReturnStmt(res[1])
+    },
+    {
+      rule: [
+        "function",
+        "name",
+        "lparen",
+        {
+          kind: "opt",
+          symbols: ["param_e"]
+        },
+        "rparen",
+        "block",
+      ],
+      action: res => res.length === 5 ? buildInitVarStmt(["const", res[1], 0, buildFuncExp([], res[4].body), 0]) : buildInitVarStmt(["const", res[1], 0, buildFuncExp(res[3], res[5].body), 0])
     },
   ],
   end_stmt: [
