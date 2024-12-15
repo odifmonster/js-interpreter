@@ -4,20 +4,27 @@ import type {
 } from "../include/parser/parseTypes.js";
 
 export const PARENT_KEY = Symbol("[[PARENT]]");
+const FUNC_KEY = Symbol("[[FUNC]]");
 
-type ExpValue = number | boolean;
+type ExpValue = number | boolean
+    | { kind: "func"; pScope: State; params: string[]; body: Statement[]; }
+    | { kind: "null"; };
+
 export type VarValue = {
   initKind: "let" | "const";
-  value: ExpValue | { kind: "undefined" } | { kind: "initialized" };
+  value: ExpValue | { kind: "initialized" } | { kind: "undefined" };
 };
 
-export type State = { [key: string]: VarValue; [PARENT_KEY]?: State };
+export type State = { [key: string]: VarValue; [PARENT_KEY]?: State; [FUNC_KEY]?: boolean; };
+
+const getVarType: (val: ExpValue) => string =
+  val => typeof val === "object" ? val.kind : typeof val;
 
 const unopBadType: (op: Unop | AugUnop, val: ExpValue) => Error = (op, val) =>
-  new Error(`SemanticError: '${op}' operation invalid for type '${typeof val}'.`);
+  new Error(`SemanticError: '${op}' operation invalid for type '${getVarType(val)}'.`);
 
 const binopBadType: (op: Binop | AugBinop, v1: ExpValue, v2: ExpValue) => Error = (op, v1, v2) =>
-  new Error(`SemanticError: '${op}' operation invalid for types '${typeof v1}' and '${typeof v2}'.`);
+  new Error(`SemanticError: '${op}' operation invalid for types '${getVarType(v1)}' and '${getVarType(v2)}'.`);
 
 const opRequiresLVal: (op: AugUnop | AugBinop) => Error = (op) =>
   new Error(`SemanticError: '${op}' operation requires assignable expression.`);
@@ -34,8 +41,15 @@ function getVarValue(state: State, name: string): ExpValue {
   const varScope = getVarScope(state, name);
   if (!(name in varScope)) throw new Error(`SemanticError: Unknown identifier '${name}'.`);
   const varVal = varScope[name].value;
-  if (typeof varVal === "object") throw new Error(`SemanticError: Variable '${name}' referenced before assignment.`);
+  if (typeof varVal === "object" && (varVal.kind === "undefined" || varVal.kind === "initialized"))
+    throw new Error(`SemanticError: Variable '${name}' referenced before assignment.`);
   return varVal;
+}
+
+function isInFunction(state: State): boolean {
+  if (!(PARENT_KEY in state)) return false;
+  if (FUNC_KEY in state) return true;
+  return isInFunction(state[PARENT_KEY]);
 }
 
 function interpNumUnop(op: Unop, val: ExpValue): number {
@@ -192,6 +206,53 @@ function interpBinop(state: State, binop: Expression): ExpValue {
   }
 }
 
+function interpFuncExp(state: State, exp: Expression): ExpValue {
+  if (exp.kind !== "func") throw new Error();
+
+  const prmCounts: Record<string, number> = {};
+  exp.params.forEach(prm => {
+    if (prm in prmCounts) throw new Error(`SemanticError: Function expression has duplicate parameter '${prm}'.`);
+    prmCounts[prm] = 1;
+  });
+
+  return {
+    kind: "func", pScope: state, params: exp.params, body: exp.body
+  };
+}
+
+function interpCallExp(state: State, exp: Expression): ExpValue {
+  if (exp.kind !== "call") throw new Error();
+
+  if (exp.callee.kind === "ident" && exp.callee.name === "print") {
+    const args = exp.args.map(arg => interpExpression(state, arg))
+        .map(v => typeof v === "object" ? v.kind === "func" ? "<func>" : "null" : v );
+    console.log(...args);
+    return { kind: "null" };
+  }
+
+  const callee = interpExpression(state, exp.callee);
+  if (!(typeof callee === "object" && callee.kind === "func"))
+    throw new Error(`SemanticError: Attempted to call a non-function value.`);
+
+  if (callee.params.length !== exp.args.length) {
+    const adj = exp.args.length < callee.params.length ? "few" : "many";
+    throw new Error(`SemanticError: Call expression has too ${adj} arguments (expected ${callee.params.length}).`);
+  }
+
+  const funcState: State = {
+    [PARENT_KEY]: callee.pScope, [FUNC_KEY]: true
+  };
+
+  exp.args.forEach((arg, i) => {
+    const argVal = interpExpression(state, arg);
+    funcState[callee.params[i]] = { initKind: "let", value: argVal };
+  });
+  
+  const retVal = interpBlock(funcState, { kind: "block", body: callee.body });
+
+  return retVal === undefined ? { kind: "null" } : retVal;
+}
+
 export function interpExpression(state: State, exp: Expression): ExpValue {
   switch (exp.kind) {
     case "number":
@@ -207,6 +268,10 @@ export function interpExpression(state: State, exp: Expression): ExpValue {
       return interpBinop(state, exp);
     case "augbinop":
       return interpAugBinop(state, exp);
+    case "func":
+      return interpFuncExp(state, exp);
+    case "call":
+      return interpCallExp(state, exp);
   }
 }
 
@@ -221,7 +286,7 @@ function interpInitVar(state: State, stmt: Statement): void {
   state[stmt.name].value = interpExpression(state, stmt.value);
 }
 
-function interpBlock(state: State, stmt: Statement): void {
+function interpBlock(state: State, stmt: Statement): ExpValue | undefined {
   if (stmt.kind !== "block") throw new Error();
 
   stmt.body.forEach(s => {
@@ -230,42 +295,52 @@ function interpBlock(state: State, stmt: Statement): void {
     }
   });
 
-  stmt.body.forEach(s => interpStatement(state, s));
+  return stmt.body.reduce((acc: ExpValue | undefined, s) => {
+    if (acc === undefined) {
+      return interpStatement(state, s);
+    }
+    return acc;
+  }, undefined);
 }
 
-function interpWhile(state: State, stmt: Statement): void {
+function interpWhile(state: State, stmt: Statement): ExpValue | undefined {
   if (stmt.kind !== "while") throw new Error();
 
   const testVal = interpExpression(state, stmt.test);
   if (testVal) {
     interpStatement(state, stmt.body);
-    interpWhile(state, stmt);
+    const retVal = interpWhile(state, stmt);
+    if (retVal !== undefined) return retVal;
+    return interpWhile(state, stmt);
   }
+
+  return undefined;
 }
 
-export function interpStatement(state: State, stmt: Statement): void {
+export function interpStatement(state: State, stmt: Statement): ExpValue | undefined {
   switch (stmt.kind) {
     case "empty":
-      break;
+      return undefined;
     case "exp":
       interpExpression(state, stmt.exp);
-      break;
+      return undefined;
     case "let":
     case "const":
       interpInitVar(state, stmt);
-      break;
+      return undefined;
     case "block":
-      interpBlock({ [PARENT_KEY]: state }, stmt);
-      break;
+      return interpBlock({ [PARENT_KEY]: state }, stmt);
     case "if":
       if (interpExpression(state, stmt.test)) {
-        interpStatement(state, stmt.truePart);
-      } else {
-        interpStatement(state, stmt.falsePart);
+        return interpStatement(state, stmt.truePart);
       }
-      break;
+      return interpStatement(state, stmt.falsePart);
     case "while":
-      interpWhile(state, stmt);
+      return interpWhile(state, stmt);
+    case "return":
+      if (!isInFunction(state))
+        throw new Error(`SemanticError: Cannot return outside of function contexts.`);
+      return interpExpression(state, stmt.exp);
   }
 }
 
