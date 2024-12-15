@@ -64,6 +64,18 @@ export function buildPostUnopTree(res) {
   }, first);
 }
 
+export function buildCallExp(res) {
+  return {
+    kind: "call", callee: res[0], args: res[1]
+  };
+}
+
+export function buildFuncExp(params, body) {
+  return {
+    kind: "func", params: params, body: body
+  };
+}
+
 export function buildStmt(res) {
   return { kind: "exp", exp: res[0] };
 }
@@ -87,5 +99,11 @@ export function buildIfStmt(res) {
 export function buildWhileStmt(res) {
   return {
     kind: "while", test: res[2], body: res[4]
+  };
+}
+
+export function buildReturnStmt(exp) {
+  return {
+    kind: "return", exp: exp
   };
 }

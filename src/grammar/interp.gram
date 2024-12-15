@@ -3,14 +3,18 @@ atom_e ::= NUMBER ___ { tok => mkNumber(parseFloat(tok.value)) }
     \ FALSE_TOK ___ { _ => mkBoolean(false) }
     \ IDENT ___ { tok => mkIdent(tok.value) }
 
-paren_e ::= lparen assign_e rparen ___ { res => res[1] }
+paren_e ::= lparen func_e rparen ___ { res => res[1] }
     \ atom_e ___ { res => res[0] }
 
 lparen ::= LPAREN ___ { mkEmpty }
 
 rparen ::= RPAREN ___ { mkEmpty }
 
-postfix_e ::= paren_e [ postfix_op ] ___ { buildPostUnopTree }
+arg_e ::= lparen ( comma_e ) rparen ___ { res => res.length === 2 ? [] : res[1] }
+
+call_e ::= paren_e ( arg_e ) ___ { res => res.length === 1 ? res[0] : buildCallExp(res) }
+
+postfix_e ::= call_e [ postfix_op ] ___ { buildPostUnopTree }
 
 postfix_op ::= PLUS2 ___ { _ => mkAugUnop("POSTINC") }
     \ MINUS2 ___ { _ => mkAugUnop("POSTDEC") }
@@ -77,7 +81,7 @@ logor_e ::= logand_e [ logor_op logand_e ] ___ { buildBinopTree }
 
 logor_op ::= PIPE2 ___ { _ => mkBinop("LOGOR") }
 
-assign_e ::= logor_e ( assign_op assign_e ) ___ { buildBinopTree }
+assign_e ::= logor_e ( assign_op func_e ) ___ { buildBinopTree }
 
 assign_op ::= EQ1 ___ { _ => mkAugBinop("ASSIGN") }
     \ STAR2_EQ ___ { _ => mkAugBinop("AUGEXPN") }
@@ -92,18 +96,31 @@ assign_op ::= EQ1 ___ { _ => mkAugBinop("ASSIGN") }
     \ CARET_EQ ___ { _ => mkAugBinop("AUGBXOR") }
     \ PIPE_EQ ___ { _ => mkAugBinop("AUGBOR") }
 
+comma_e ::= func_e [ comma func_e ] ___ { res => res.filter(e => e.kind !== "empty") }
+
+comma ::= COMMA ___ { mkEmpty }
+
+param_e ::= name [ comma name ] ___ { res => res.filter(e => typeof e === "string") }
+
 block ::= lbrace stmt_seq rbrace ___ { mkBlock }
 
 lbrace ::= LBRACE ___ { mkEmpty }
 
 rbrace ::= RBRACE ___ { mkEmpty }
 
+func_e ::= function lparen ( param_e ) rparen block ___ {
+    res => res.length === 4 ? buildFuncExp([], res[3]) : buildFuncExp(res[2], res[4]) }
+    \ assign_e ___ { res => res[0] }
+
+function ::= FUNCTION_KW ___ { mkEmpty }
+
 stmt ::= end_stmt ___ { res => res[0] }
-    \ assign_e end_stmt ___ { buildStmt }
-    \ init_kw name equals assign_e end_stmt ___ { buildInitVarStmt }
+    \ func_e end_stmt ___ { buildStmt }
+    \ init_kw name equals func_e end_stmt ___ { buildInitVarStmt }
     \ block ___ { res => res[0] }
-    \ if lparen assign_e rparen stmt ( else stmt ) ___ { buildIfStmt }
-    \ while lparen assign_e rparen stmt ___ { buildWhileStmt }
+    \ if lparen func_e rparen stmt ( else stmt ) ___ { buildIfStmt }
+    \ while lparen func_e rparen stmt ___ { buildWhileStmt }
+    \ return func_e end_stmt ___ { res => buildReturnStmt(res[1]) }
 
 end_stmt ::= SEMICOLON ___ { mkEmpty }
 
@@ -119,6 +136,8 @@ if ::= IF_KW ___ { mkEmpty }
 else ::= ELSE_KW ___ { mkEmpty }
 
 while ::= WHILE_KW ___ { mkEmpty }
+
+return ::= RETURN_KW ___ { mkEmpty }
 
 stmt_seq ::= [ stmt ] ___ { res => res.filter(s => s.kind !== "empty") }
 

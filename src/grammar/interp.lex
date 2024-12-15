@@ -5,6 +5,7 @@ tok -> { <LBRACE>
 tok -> } <RBRACE>
 tok -> ~ <TILDE>
 tok -> ; <SEMICOLON>
+tok -> , <COMMA>
 tok -> + plus
 tok -> - minus
 tok -> / slash
@@ -67,6 +68,7 @@ rangle2 -> = <RANGLE2_EQ>
 [rangle2 -> OTHER <RANGLE2>]
 
 eq -> = <EQ2>
+eq -> > <ARROW>
 [eq -> OTHER <EQ1>]
 
 amper -> & <AMPER2>
@@ -113,6 +115,8 @@ RESERVED
     false -> FALSE_TOK
     let -> LET_KW
     const -> CONST_KW
+    return -> RETURN_KW
     if -> IF_KW
     else -> ELSE_KW
     while -> WHILE_KW
+    function -> FUNCTION_KW
