@@ -36,28 +36,13 @@ const opRequiresLVal: (op: AugUnop | AugBinop) => Error = (op) =>
 const modifiedConst: (name: string) => Error = name =>
   new Error(`SemanticError: Cannot modify constant '${name}'.`);
 
-// SCOPING AND PROGRAM STATE FUNCTIONS
+// INTERPRETER FUNCTIONS
 
-/**
- * Gets the immediate state/scope containing the target variable. Returns the global scope
- * on failure.
- * @param state The current state from which to start searching
- * @param name The name of the variable
- * @returns The scope containing the variable or the global scope if not found
- */
 function getVarScope(state: State, name: string): State {
   if (!(PARENT_KEY in state) || name in state) return state;
   return getVarScope(state[PARENT_KEY], name);
 }
 
-/**
- * Gets the value of the target variable from the program state.
- * @param state The current program state
- * @param name The name of the variable
- * @returns The value stored in the target variable.
- * @throws An error if the variable is not accessible from the current state
- * or if it has not been assigned a value.
- */
 function getVarValue(state: State, name: string): ExpValue {
   const varScope = getVarScope(state, name);
   if (!(name in varScope)) throw new Error(`SemanticError: Unknown identifier '${name}'.`);
@@ -67,11 +52,6 @@ function getVarValue(state: State, name: string): ExpValue {
   return varVal;
 }
 
-/**
- * Checks whether the program is currently inside a function execution context.
- * @param state The current program state
- * @returns true if the program is inside a function call and false otherwise.
- */
 function isInFunction(state: State): boolean {
   if (!(PARENT_KEY in state)) return false;
   if (FUNC_KEY in state) return true;
