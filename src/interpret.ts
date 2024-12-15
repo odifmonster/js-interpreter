@@ -3,6 +3,8 @@ import type {
   Unop, Binop, AugUnop, AugBinop
 } from "../include/parser/parseTypes.js";
 
+// TYPES AND CONSTANTS
+
 export const PARENT_KEY = Symbol("[[PARENT]]");
 const FUNC_KEY = Symbol("[[FUNC]]");
 
@@ -16,6 +18,8 @@ export type VarValue = {
 };
 
 export type State = { [key: string]: VarValue; [PARENT_KEY]?: State; [FUNC_KEY]?: boolean; };
+
+// ERROR MESSAGES
 
 const getVarType: (val: ExpValue) => string =
   val => typeof val === "object" ? val.kind : typeof val;
@@ -32,11 +36,28 @@ const opRequiresLVal: (op: AugUnop | AugBinop) => Error = (op) =>
 const modifiedConst: (name: string) => Error = name =>
   new Error(`SemanticError: Cannot modify constant '${name}'.`);
 
+// SCOPING AND PROGRAM STATE FUNCTIONS
+
+/**
+ * Gets the immediate state/scope containing the target variable. Returns the global scope
+ * on failure.
+ * @param state The current state from which to start searching
+ * @param name The name of the variable
+ * @returns The scope containing the variable or the global scope if not found
+ */
 function getVarScope(state: State, name: string): State {
   if (!(PARENT_KEY in state) || name in state) return state;
   return getVarScope(state[PARENT_KEY], name);
 }
 
+/**
+ * Gets the value of the target variable from the program state.
+ * @param state The current program state
+ * @param name The name of the variable
+ * @returns The value stored in the target variable.
+ * @throws An error if the variable is not accessible from the current state
+ * or if it has not been assigned a value.
+ */
 function getVarValue(state: State, name: string): ExpValue {
   const varScope = getVarScope(state, name);
   if (!(name in varScope)) throw new Error(`SemanticError: Unknown identifier '${name}'.`);
@@ -46,12 +67,18 @@ function getVarValue(state: State, name: string): ExpValue {
   return varVal;
 }
 
+/**
+ * Checks whether the program is currently inside a function execution context.
+ * @param state The current program state
+ * @returns true if the program is inside a function call and false otherwise.
+ */
 function isInFunction(state: State): boolean {
   if (!(PARENT_KEY in state)) return false;
   if (FUNC_KEY in state) return true;
   return isInFunction(state[PARENT_KEY]);
 }
 
+// Interpret unary operator expressions for numbers
 function interpNumUnop(op: Unop, val: ExpValue): number {
   if (typeof val !== "number") throw unopBadType(op, val);
 
@@ -65,14 +92,15 @@ function interpNumUnop(op: Unop, val: ExpValue): number {
   }
 }
 
+// Interpret unary operator expressions that update a value in memory
 function interpAugUnop(state: State, exp: Expression): ExpValue {
-  if (exp.kind !== "augunop") throw new Error();
-  if (exp.child.kind !== "ident")
-    throw opRequiresLVal(exp.op);
+  if (exp.kind !== "augunop") throw new Error(); // Incorrect use of this function
+  if (exp.child.kind !== "ident") // throw an error if the left side does not refer to
+    throw opRequiresLVal(exp.op); // a location in memory
 
   const varScope = getVarScope(state, exp.child.name);
   const startVal = interpExpression(state, exp.child);
-  if (typeof startVal !== "number") throw unopBadType(exp.op, startVal);
+  if (typeof startVal !== "number") throw unopBadType(exp.op, startVal); // these operators are only valid for numbers
   if (varScope[exp.child.name].initKind === "const") throw modifiedConst(exp.child.name);
 
   switch (exp.op) {
@@ -89,10 +117,12 @@ function interpAugUnop(state: State, exp: Expression): ExpValue {
   }
 }
 
+// interpret unary operators that don't require type checking
 function interpUnop(state: State, unop: Expression): ExpValue {
   if (unop.kind !== "unop") throw new Error();
 
-  const val = interpExpression(state, unop.child);
+  let val = interpExpression(state, unop.child);
+  if (typeof val === "object" && val.kind === "null") val = false;
 
   switch (unop.op) {
     case "BITNOT":
@@ -143,6 +173,7 @@ function interpNumBinop(binop: Binop, lval: ExpValue, rval: ExpValue): ExpValue 
   }
 }
 
+// interpret binary operators that update locations in memory
 function interpAugBinop(state: State, exp: Expression): ExpValue {
   if (exp.kind !== "augbinop") throw new Error();
   if (exp.left.kind !== "ident") throw opRequiresLVal(exp.op);
@@ -153,13 +184,13 @@ function interpAugBinop(state: State, exp: Expression): ExpValue {
   if (!(exp.left.name in varScope)) throw new Error(`SemanticError: Unknown identifier '${exp.left.name}'.`);
   if (varScope[exp.left.name].initKind === "const") throw modifiedConst(exp.left.name);
 
-  if (exp.op === "ASSIGN") {
+  if (exp.op === "ASSIGN") { // no type checking for assignment
     return varScope[exp.left.name].value = rval;
   }
 
   const lval = interpExpression(state, exp.left);
   if (!(typeof lval === "number" && typeof rval === "number"))
-    throw binopBadType(exp.op, lval, rval);
+    throw binopBadType(exp.op, lval, rval); // all other operators require numbers
 
   let newVal: number;
 
@@ -223,7 +254,7 @@ function interpFuncExp(state: State, exp: Expression): ExpValue {
 function interpCallExp(state: State, exp: Expression): ExpValue {
   if (exp.kind !== "call") throw new Error();
 
-  if (exp.callee.kind === "ident" && exp.callee.name === "print") {
+  if (exp.callee.kind === "ident" && exp.callee.name === "print") { // special case for printing
     const args = exp.args.map(arg => interpExpression(state, arg))
         .map(v => typeof v === "object" ? v.kind === "func" ? "<func>" : "null" : v );
     console.log(...args);
@@ -293,13 +324,13 @@ function interpBlock(state: State, stmt: Statement): ExpValue | undefined {
     if ((s.kind === "let" || s.kind === "const") && !(s.name in state)) {
       state[s.name] = { initKind: s.kind, value: { kind: "undefined" } };
     }
-  });
+  }); // initial traversal to 'hoist' all variable declarations
 
   return stmt.body.reduce((acc: ExpValue | undefined, s) => {
     if (acc === undefined) {
       return interpStatement(state, s);
     }
-    return acc;
+    return acc; // do not evaluate anything after a return
   }, undefined);
 }
 
@@ -310,7 +341,7 @@ function interpWhile(state: State, stmt: Statement): ExpValue | undefined {
   if (testVal) {
     interpStatement(state, stmt.body);
     const retVal = interpWhile(state, stmt);
-    if (retVal !== undefined) return retVal;
+    if (retVal !== undefined) return retVal; // do not evaluate after return
     return interpWhile(state, stmt);
   }
 
